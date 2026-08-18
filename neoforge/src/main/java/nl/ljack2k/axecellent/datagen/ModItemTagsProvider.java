@@ -11,14 +11,15 @@ import nl.ljack2k.axecellent.chainsaw.ModTags;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Generates {@code #axecellent:chainsaw} - the tools that cut a whole tree in one
- * break - <strong>empty on purpose</strong>.
+ * Generates the four tool tags - {@code #axecellent:chainsaw} plus one per cut mode -
+ * <strong>all empty on purpose</strong>.
  * <p>
  * The chainsaw is not granted to axes, nor to any default list of tools. A pack
  * decides which item gets it, normally from a KubeJS server script:
  * <pre>
  * ServerEvents.tags('item', event -&gt; {
- *     event.add('axecellent:chainsaw', 'yourmod:stone_hatchet')
+ *     event.add('axecellent:chainsaw', 'yourmod:stone_hatchet')     // configured mode
+ *     event.add('axecellent:chainsaw_held', 'minecraft:wooden_axe')  // pinned to HELD
  * })
  * </pre>
  * So a fresh install does nothing at all until something is added to this tag. That
@@ -40,5 +41,8 @@ public final class ModItemTagsProvider extends ItemTagsProvider {
     protected void addTags(HolderLookup.Provider provider) {
         // Deliberately no .add(...) / .addTag(...) - see the class comment.
         tag(ModTags.Items.CHAINSAW);
+        tag(ModTags.Items.CHAINSAW_PROGRESSIVE);
+        tag(ModTags.Items.CHAINSAW_HELD);
+        tag(ModTags.Items.CHAINSAW_INSTANT);
     }
 }

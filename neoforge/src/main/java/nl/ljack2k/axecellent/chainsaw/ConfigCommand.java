@@ -21,11 +21,14 @@ import java.util.Locale;
  * {@code /axecellent config} - read and change the chainsaw settings in-game,
  * instead of editing the TOML and reloading.
  * <p>
- * The whole command tree is <em>derived</em> from {@link Config}: the option names
+ * The whole command tree is <em>derived</em> from {@link Config#OPTIONS}: the option names
  * come from each value's config path, and the accepted range, the default and the
- * help text come from its {@code ValueSpec}. Adding an option to {@code Config} and
- * listing it in {@link #OPTIONS} is therefore all it takes - there are no bounds or
- * descriptions duplicated here to drift out of sync.
+ * help text come from its {@code ValueSpec}. Adding an option to {@code Config} is therefore
+ * all it takes - nothing is listed, bounded or described twice, so with three near-identical
+ * per-mode sections there is nothing here to drift out of sync.
+ * <p>
+ * Option names are the full dotted paths, so the per-mode ones read as
+ * {@code /axecellent config held.maxLogs 8} and tab-complete by section.
  * <p>
  * Changes are written straight to the config file, so they survive a restart.
  * Requires permission level 2 (op), because this changes how the world behaves for
@@ -36,25 +39,8 @@ public final class ConfigCommand {
     private ConfigCommand() {
     }
 
-    /** Every option the command exposes, in the order it lists them. */
-    private static final List<ModConfigSpec.ConfigValue<?>> OPTIONS = List.of(
-            Config.MODE,
-            Config.HELD_SNEAK_STARTS_AT_YOU,
-            Config.HELD_LOGS_PER_CHOP,
-            Config.HELD_RESUME_WINDOW,
-            Config.LOGS_PER_TICK,
-            Config.MAX_CONCURRENT_CUTS,
-            Config.MAX_LOGS,
-            Config.CLEAR_LEAVES,
-            Config.MAX_LEAVES,
-            Config.REQUIRE_LEAVES,
-            Config.DROPS_AT_BREAK_POSITION,
-            Config.SNEAK_TO_DISABLE,
-            Config.ENABLED_IN_CREATIVE,
-            Config.RESPECT_BLOCK_PROTECTION,
-            Config.DURABILITY_PER_LOG,
-            Config.DURABILITY_FOR_LEAVES,
-            Config.STOP_BEFORE_TOOL_BREAKS);
+    /** Every option the command exposes, in config-file order. */
+    private static final List<ModConfigSpec.ConfigValue<?>> OPTIONS = Config.OPTIONS;
 
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {

@@ -82,6 +82,18 @@ who spends that plan, and how fast, is the mode:
 | `PROGRESSIVE` | kept, handed back last | server tick, `logsPerTick` | furthest first |
 | `HELD` | kept, handed back last | the player finishing a chop | furthest first, or nearest first while crouching |
 
+**Only mode-specific settings live in a mode's config section**: `progressive.logsPerTick` and
+the three `held.*` options. Everything else means the same thing in every mode, so it is global
+in `[chainsaw]` / `[durability]`. `Config.OPTIONS` is built as the options are defined, so
+`ConfigCommand` needs no list of its own.
+
+**Which mode a break uses comes from the tool, not the config.** `ModTags.modeFor(stack)`
+returns the mode for the pinned tag the tool sits in (`#axecellent:chainsaw_held`,
+`_progressive`, `_instant`), falls back to `chainsaw.mode` for the plain
+`#axecellent:chainsaw` tag, and returns `null` for a tool that is not a chainsaw at all -
+so one call answers both "do we cut?" and "how?". A mode tag grants the chainsaw by
+itself, so pinning a tool is one tag entry rather than two.
+
 **HELD has no timer, deliberately.** Three earlier versions did, and all three felt wrong:
 the cut either coasted after the player let go (reads as automatic) or waited and lurched
 (one swing, twenty blocks). Driving it off completed break events removes the clock, so the
@@ -92,10 +104,11 @@ Do not reintroduce a tick-driven path for HELD.
 The sequence:
 
 1. `ChainsawHandler` listens for `BlockEvent.BreakEvent`. It bails out unless the break is
-   server-side, on a block in `#axecellent:chainsaw_logs`, by a player holding an item in
-   `#axecellent:chainsaw`, and not blocked by the sneak or creative rules.
+   server-side, on a block in `#axecellent:chainsaw_logs`, by a player holding a tool
+   `ModTags.modeFor` recognises, and not blocked by the sneak or creative rules. The mode
+   that call returns is the mode for the rest of the sequence.
 2. `Chainsaw.plan` flood-fills connected logs (26-neighbour, because oak and jungle
-   branches join diagonally), capped by `chainsaw.maxLogs`; optionally requires attached
+   branches join diagonally), capped by the mode's `maxLogs`; optionally requires attached
    leaves; works out how many blocks the tool can pay for; then flood-fills the canopy,
    remembering which log each leaf hangs from. Logs are ordered by *depth through the log
    network*, not straight-line distance, so a branch curling back still falls early.
@@ -232,12 +245,12 @@ resource root and is **committed to git**. That is deliberate: `release.yml` onl
 runs `gradlew build` and never regenerates, so the repo has to hold the current
 output.
 
-The mod adds no items or blocks, so the only generated data is the three tags:
+The mod adds no items or blocks, so the only generated data is the six tags:
 
 | Provider | Generates |
 |---|---|
 | `ModBlockTagsProvider` | `axecellent:chainsaw_logs`, `axecellent:chainsaw_leaves` — defaulted to `#minecraft:logs` / `#minecraft:leaves` |
-| `ModItemTagsProvider` | `axecellent:chainsaw` — generated **empty on purpose**; a pack grants it |
+| `ModItemTagsProvider` | `axecellent:chainsaw` plus `_progressive`, `_held`, `_instant` — all generated **empty on purpose**; a pack grants them |
 
 **After changing a default tag: run `runData` and commit the diff.**
 

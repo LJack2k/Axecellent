@@ -69,9 +69,14 @@ public final class Chainsaw {
      * <p>
      * Excludes the block the player hit: vanilla owns that one. INSTANT lets it break there
      * and then, while the animated modes keep it standing and hand it back at the end.
+     * <p>
+     * It carries the mode it was planned for, so whoever spends it does not have to work that
+     * out again: the cascade reads it to know whether the bites come from ticks or from chops.
      */
-    public record Plan(List<Step> steps, int durability, int logCount, int leafCount) {
-        public static final Plan NOTHING = new Plan(List.of(), 0, 0, 0);
+    public record Plan(List<Step> steps, int durability, int logCount, int leafCount, CutMode mode) {
+        static Plan nothing(CutMode mode) {
+            return new Plan(List.of(), 0, 0, 0, mode);
+        }
 
         public boolean isEmpty() {
             return steps.isEmpty();
@@ -86,7 +91,7 @@ public final class Chainsaw {
         public Plan reversed() {
             List<Step> flipped = new ArrayList<>(steps);
             Collections.reverse(flipped);
-            return new Plan(flipped, durability, logCount, leafCount);
+            return new Plan(flipped, durability, logCount, leafCount, mode);
         }
     }
 
@@ -105,11 +110,13 @@ public final class Chainsaw {
      * Decide what the tree at {@code origin} loses.
      *
      * @param origin the log the player broke. Never part of the returned steps.
+     * @param mode   the mode this cut will run in, from the tool's tag. Recorded on the plan
      */
-    public static Plan plan(ServerLevel level, ServerPlayer player, BlockPos origin, ItemStack tool) {
+    public static Plan plan(ServerLevel level, ServerPlayer player, BlockPos origin, ItemStack tool,
+                            CutMode mode) {
         Map<BlockPos, Integer> depths = collectLogs(level, origin, Config.MAX_LOGS.get());
         if (Config.REQUIRE_LEAVES.get() && !hasAttachedLeaves(level, depths.keySet())) {
-            return Plan.NOTHING;
+            return Plan.nothing(mode);
         }
 
         // The origin anchors the search and counts towards maxLogs, but vanilla is the
@@ -117,7 +124,7 @@ public final class Chainsaw {
         List<BlockPos> logs = new ArrayList<>(depths.keySet());
         logs.remove(origin);
         if (logs.isEmpty()) {
-            return Plan.NOTHING;
+            return Plan.nothing(mode);
         }
 
         // Deepest first, so the cut travels inwards and finishes where the player hit.
@@ -131,7 +138,7 @@ public final class Chainsaw {
         if (perLog > 0) {
             int affordable = budget / perLog;
             if (affordable <= 0) {
-                return Plan.NOTHING;
+                return Plan.nothing(mode);
             }
             if (logs.size() > affordable) {
                 logs = new ArrayList<>(logs.subList(0, affordable));
@@ -166,17 +173,19 @@ public final class Chainsaw {
             steps.set(steps.size() - 1, new Step(last.log(), merged));
         }
 
-        return new Plan(steps, spent, logs.size(), leafCount);
+        return new Plan(steps, spent, logs.size(), leafCount, mode);
     }
 
     /**
      * Remove everything in a plan right now - this is {@link CutMode#INSTANT}. The
      * progressive mode spends the same plan over several ticks instead.
      *
-     * @param dropAt where drops land, per {@link Config#DROPS_AT_BREAK_POSITION}
+     * @param origin the block the player broke, and where the drops collect if
+     *               {@link Config#DROPS_AT_BREAK_POSITION} says so
      */
     public static Result execute(ServerLevel level, ServerPlayer player, Plan plan,
-                                 BlockPos dropAt, ItemStack tool, boolean chargeDurability) {
+                                 BlockPos origin, ItemStack tool, boolean chargeDurability) {
+        BlockPos dropAt = Config.DROPS_AT_BREAK_POSITION.get() ? origin : null;
         int logs = 0;
         int leaves = 0;
         for (Step step : plan.steps()) {
@@ -199,6 +208,9 @@ public final class Chainsaw {
      * Remove one block the way a player break would: protection first, then drops, then
      * removal with the usual particles and sound.
      *
+     * @param dropAt where the drops should land, or null to leave them where the block stood.
+     *               Resolved by the caller from {@link Config#DROPS_AT_BREAK_POSITION}, so the
+     *               innermost loop of a cut does not re-read the config for every block
      * @return false if the block was vetoed, already changed, or out of a loaded chunk
      */
     public static boolean breakOne(ServerLevel level, ServerPlayer player, BlockPos pos,
@@ -221,7 +233,7 @@ public final class Chainsaw {
 
             BlockEntity blockEntity = state.hasBlockEntity() ? level.getBlockEntity(pos) : null;
             if (!player.isCreative()) {
-                if (Config.DROPS_AT_BREAK_POSITION.get()) {
+                if (dropAt != null) {
                     // getDrops + popResource rather than dropResources: only this pair
                     // lets the items appear somewhere other than the block's own
                     // position, and popResource still honours the doTileDrops gamerule.

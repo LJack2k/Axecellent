@@ -6,12 +6,11 @@ something non-obvious, add it here rather than re-deriving it next session.
 
 ## What this is
 
-Axecellent fells trees: break a log with a tool carrying the
-`#axecellent:chainsaw` item tag and the connected tree comes down. Tag-driven,
-**not** an enchantment.
+Axecellent fells trees: break a log with a tool carrying one of its four item tags
+and the connected tree comes down. Tag-driven, **not** an enchantment.
 
 It is a **behaviour mod**, not a content mod: no items, no blocks, no enchantments,
-no recipes. Nine top-level classes, three tags, one server config, one event hook. Cutting is
+no recipes. Nine top-level classes, six tags, one server config, one event hook. Cutting is
 entirely server-side; the only client-side behaviour is a tooltip.
 
 **Three cut modes, one planner.** `Chainsaw.plan` decides what comes out and in what
@@ -22,6 +21,48 @@ order; the mode decides who spends that plan:
 | `INSTANT` | vanilla breaks it now | nothing, all at once |
 | `PROGRESSIVE` | kept, handed back last | server tick, `logsPerTick` |
 | `HELD` | kept, handed back last | the player finishing a chop |
+
+**The mode is a property of the tool, not a global setting.** `ModTags.modeFor(stack)`
+answers both questions at once: null means "not a chainsaw, ordinary break", anything
+else is the mode to cut in. A tool in `#axecellent:chainsaw_held` / `_progressive` /
+`_instant` is pinned to that mode; a tool in the plain `#axecellent:chainsaw` follows
+`chainsaw.mode`, which is now only a fallback. A mode tag also *grants* the chainsaw,
+so a pack adds one line per tool, not two.
+
+This came from the maintainer, after Mays: the modes read as a progression across tool
+materials (wooden = HELD, iron/diamond = PROGRESSIVE, netherite = INSTANT) rather than
+one server-wide choice that leaves two of the three modes permanently unused. Do not
+regress this to reading `Config.MODE` at the call site - `ChainsawHandler` must resolve
+the mode from the tool, and `ChainsawTooltip` must read it from tags (never from the
+config, which the client may not have received yet).
+
+A tool in two mode tags is a pack mistake with no right answer; `ModTags.pinnedMode`
+picks the most hands-on match (held, progressive, instant) purely so the behaviour is
+deterministic and documented. It is a tie-break, not a feature.
+
+**A config setting goes in a mode's section only if it is specific to that mode.** That is the
+maintainer's rule, and it was arrived at by getting it wrong first: an earlier attempt gave all
+three modes their own copy of maxLogs, clearLeaves, maxLeaves, dropsAtBreakPosition and the
+three durability settings. Rejected - those mean exactly the same thing whichever way the tree
+falls, so tripling them tripled the file and turned one obvious knob into three that can
+silently disagree. Only `progressive.logsPerTick` and the three `held.*` settings are genuinely
+mode-specific, so those are the only per-mode sections. INSTANT has none: having nothing to
+pace is what makes it instant.
+
+So when adding an option, ask whether it would mean something different in another mode. If
+not, it is global - `[chainsaw]` or `[durability]`.
+
+**Nothing lists the options twice.** `Config` collects every value as it defines it and exposes
+`Config.OPTIONS`; `ConfigCommand` just walks that.
+
+`Chainsaw.Plan` and `ChainsawCascade.Cut` both carry the `CutMode`, but only so the cascade
+knows whether bites come from ticks or from chops - not to look up settings. Config values are
+read live rather than snapshotted, so a change applies to cuts already falling.
+
+**Renaming or moving a config key silently discards whatever was set.** NeoForge drops keys
+that are no longer in the spec on first load - no warning, no log line, the value just reverts
+to the default. Verified. Free to do now (nothing is published with these keys set), but once
+packs are in the wild a key move needs a release note, because nothing else tells anyone.
 
 **HELD must not have a timer.** Three versions did, and all three were rejected in
 testing: a timer either coasts after the player lets go (reads as automatic - "feels
@@ -42,8 +83,8 @@ alternative to enchantment-based choppers by someone who dislikes vein-miners
 because they "ruin modpacks". Do not grow it into a general vein-miner (ores,
 stone, arbitrary block tags) without being asked.
 
-**The chainsaw tag ships EMPTY, and that is deliberate.** `#axecellent:chainsaw` has
-no default entries - not axes, not any list - so a fresh install does nothing at all.
+**The tool tags ship EMPTY, and that is deliberate.** None of the four have default
+entries - not axes, not any list - so a fresh install does nothing at all.
 How the tag ends up on an item is entirely the pack's business - datapack, KubeJS,
 another mod, something else. Do **not** assume, recommend or hard-code a particular
 route; the mod asks one question ("is this item in the tag?") and nothing more.

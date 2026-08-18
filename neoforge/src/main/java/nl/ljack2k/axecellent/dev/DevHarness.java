@@ -23,9 +23,11 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import nl.ljack2k.axecellent.Axecellent;
-import nl.ljack2k.axecellent.chainsaw.ModTags;
 import nl.ljack2k.axecellent.chainsaw.Chainsaw;
 import nl.ljack2k.axecellent.chainsaw.ChainsawCascade;
+import nl.ljack2k.axecellent.chainsaw.Config;
+import nl.ljack2k.axecellent.chainsaw.CutMode;
+import nl.ljack2k.axecellent.chainsaw.ModTags;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -161,6 +163,8 @@ public final class DevHarness {
      * the origin log is removed the way vanilla removes the block the player hit.
      * Gives the player a diamond axe first unless they are already holding a tool
      * that carries the chainsaw tag, so a specific tool can be tested deliberately.
+     * <p>
+     * It reports the mode the tool would use, even though it always removes the tree at once.
      */
     private static int cut(CommandSourceStack src) {
         ServerPlayer player = src.getPlayer();
@@ -178,21 +182,27 @@ public final class DevHarness {
         }
 
         ItemStack tool = player.getMainHandItem();
-        if (!tool.is(ModTags.Items.CHAINSAW)) {
+        if (!ModTags.isChainsaw(tool)) {
             tool = new ItemStack(Items.DIAMOND_AXE);
             player.setItemInHand(InteractionHand.MAIN_HAND, tool);
         }
         int durabilityBefore = tool.getDamageValue();
 
-        Chainsaw.Plan plan = Chainsaw.plan(level, player, origin, tool);
+        CutMode mode = ModTags.modeFor(tool);
+        if (mode == null) {
+            mode = Config.MODE.get();
+        }
+
+        Chainsaw.Plan plan = Chainsaw.plan(level, player, origin, tool, mode);
         Chainsaw.Result result = Chainsaw.execute(level, player, plan, origin, tool, true);
         // Vanilla's half of the break: remove the block the "player hit", with drops.
         level.destroyBlock(origin, !player.isCreative(), player);
 
         int spent = tool.getDamageValue() - durabilityBefore;
         src.sendSuccess(() -> Component.literal(String.format(
-                "[Axecellent] cut from %s: %d extra log(s), %d leaf/leaves, %d durability (reported %d).",
-                origin, result.logs(), result.leaves(), spent, result.durability())), false);
+                "[Axecellent] cut from %s as %s: %d extra log(s), %d leaf/leaves, "
+                        + "%d durability (reported %d).",
+                origin, plan.mode(), result.logs(), result.leaves(), spent, result.durability())), false);
         return 1;
     }
 

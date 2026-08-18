@@ -62,6 +62,8 @@ public final class ChainsawCascade {
         private final ItemStack tool;
         private final BlockPos origin;
         private final List<Chainsaw.Step> steps;
+        /** The mode this cut runs in. HELD is the one that changes how the bites arrive. */
+        private final CutMode mode;
         private final boolean held;
         /** Per-log durability, only used by HELD - the other modes pay up front. */
         private final int perLog;
@@ -74,13 +76,14 @@ public final class ChainsawCascade {
         private long lastProgress;
 
         private Cut(ServerLevel level, ServerPlayer player, ItemStack tool, BlockPos origin,
-                    List<Chainsaw.Step> steps, boolean held, int perLog, int perLeaf) {
+                    List<Chainsaw.Step> steps, CutMode mode, int perLog, int perLeaf) {
             this.level = level;
             this.player = player;
             this.tool = tool;
             this.origin = origin;
             this.steps = steps;
-            this.held = held;
+            this.mode = mode;
+            this.held = mode == CutMode.HELD;
             this.perLog = perLog;
             this.perLeaf = perLeaf;
             this.lastProgress = level.getGameTime();
@@ -129,9 +132,8 @@ public final class ChainsawCascade {
     }
 
     /**
-     * Queue a tree.
+     * Queue a tree. The mode comes from the plan, which took it from the tool's tag.
      *
-     * @param held     true for {@link CutMode#HELD}: bites come from {@link #chop}, not ticks
      * @param perLog   durability charged per log as it falls; 0 when the caller already charged
      *                 the whole cut up front
      * @param perLeaf  the same for leaves - normally 0, since chargeForLeaves is off by
@@ -139,8 +141,8 @@ public final class ChainsawCascade {
      *                 every leaf costs several times a whole tree's worth
      */
     public static void submit(ServerLevel level, ServerPlayer player, ItemStack tool, BlockPos origin,
-                              Chainsaw.Plan plan, boolean held, int perLog, int perLeaf) {
-        ACTIVE_CUTS.add(new Cut(level, player, tool, origin.immutable(), plan.steps(), held,
+                              Chainsaw.Plan plan, int perLog, int perLeaf) {
+        ACTIVE_CUTS.add(new Cut(level, player, tool, origin.immutable(), plan.steps(), plan.mode(),
                 perLog, perLeaf));
     }
 
@@ -148,8 +150,8 @@ public final class ChainsawCascade {
      * A chop the player finished on a tree that has a cut running: take one bite.
      * <p>
      * This is all of HELD's pacing. One completed chop takes down
-     * {@link Config#HELD_LOGS_PER_CHOP} logs, furthest first, and between chops nothing
-     * happens at all.
+     * {@link Config#HELD_LOGS_PER_CHOP} logs, furthest first, and between chops nothing happens
+     * at all.
      */
     public static void chop(ServerLevel level, ServerPlayer player, BlockPos pos) {
         Iterator<Cut> cuts = ACTIVE_CUTS.iterator();
@@ -190,10 +192,9 @@ public final class ChainsawCascade {
         if (ACTIVE_CUTS.isEmpty()) {
             return;
         }
-        int perTick = Config.LOGS_PER_TICK.get();
         Iterator<Cut> cuts = ACTIVE_CUTS.iterator();
         while (cuts.hasNext()) {
-            if (!tick(cuts.next(), perTick)) {
+            if (!tick(cuts.next())) {
                 cuts.remove();
             }
         }
@@ -202,7 +203,7 @@ public final class ChainsawCascade {
     /**
      * @return false when this cut is finished or has been abandoned
      */
-    private static boolean tick(Cut cut, int logs) {
+    private static boolean tick(Cut cut) {
         // If the player left, logged out, or changed dimension, stop where we are. The half-cut
         // tree stays standing, which is better than dropping items for an absent player or
         // guessing at their tool.
@@ -223,7 +224,7 @@ public final class ChainsawCascade {
             return keep;
         }
 
-        advance(cut, logs);
+        advance(cut, Config.LOGS_PER_TICK.get());
         if (cut.done()) {
             // PROGRESSIVE is one continuous motion, so the origin goes with the last log.
             // HELD deliberately waits for another chop instead - see chop().

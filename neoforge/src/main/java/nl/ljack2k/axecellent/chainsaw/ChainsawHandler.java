@@ -9,8 +9,11 @@ import net.neoforged.neoforge.event.level.BlockEvent;
 import nl.ljack2k.axecellent.Axecellent;
 
 /**
- * The one hook the mod needs: watch player block breaks, and when a tool carrying
- * {@code #axecellent:chainsaw} breaks a log, cut the tree.
+ * The one hook the mod needs: watch player block breaks, and when a chainsaw tool breaks a
+ * log, cut the tree.
+ * <p>
+ * Which tool that is, and which mode it cuts in, both come from the tool's tags - see
+ * {@link ModTags#modeFor}. Nothing here knows about specific items.
  * <p>
  * What happens to the break event depends on the mode, and the difference matters:
  * <ul>
@@ -59,7 +62,15 @@ public final class ChainsawHandler {
         if (player.isCreative() && !Config.ENABLED_IN_CREATIVE.get()) {
             return;
         }
-        CutMode mode = Config.MODE.get();
+        // The tool decides both whether we cut and how. A tool in one of the mode tags uses
+        // that mode; one in the plain chainsaw tag falls back to the configured default; and
+        // anything else is not a chainsaw and gets an ordinary break.
+        ItemStack tool = player.getMainHandItem();
+        CutMode mode = ModTags.modeFor(tool);
+        if (mode == null) {
+            return;
+        }
+
         boolean sneaking = player.isShiftKeyDown();
         // In HELD, crouching redirects the cut instead of switching it off: it starts at the
         // block under the crosshair and eats away from the player. Crouch plus one chop is
@@ -68,11 +79,6 @@ public final class ChainsawHandler {
                 && sneaking
                 && Config.HELD_SNEAK_STARTS_AT_YOU.get();
         if (Config.SNEAK_TO_DISABLE.get() && sneaking && !sneakRedirects) {
-            return;
-        }
-
-        ItemStack tool = player.getMainHandItem();
-        if (!tool.is(ModTags.Items.CHAINSAW)) {
             return;
         }
 
@@ -101,7 +107,7 @@ public final class ChainsawHandler {
             }
         }
 
-        Chainsaw.Plan plan = Chainsaw.plan(level, player, event.getPos(), tool);
+        Chainsaw.Plan plan = Chainsaw.plan(level, player, event.getPos(), tool, mode);
         if (plan.isEmpty()) {
             // Nothing to cut beyond the block itself - leave the break completely alone
             // rather than cancelling it and handing back an identical result.
@@ -138,7 +144,7 @@ public final class ChainsawHandler {
                 // cost or damage the wrong item.
                 tool.hurtAndBreak(plan.durability(), level, player, item -> {});
             }
-            ChainsawCascade.submit(level, player, tool, event.getPos(), plan, held, perLog, perLeaf);
+            ChainsawCascade.submit(level, player, tool, event.getPos(), plan, perLog, perLeaf);
             if (held) {
                 // This break was itself a completed chop, so it earns the first bite. Without
                 // this the opening chop only sets the cut up and appears to do nothing.
