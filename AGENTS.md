@@ -389,6 +389,18 @@ creates the Release, and both publish workflows fire off its completion. A store
 cannot be cleanly retracted, so do not push a tag speculatively, and never as a way of
 testing the pipeline — use Actions -> Run workflow against an existing tag for that.
 
+**The first store release will be v1.0.0**, and nothing before it. That is the
+maintainer's call, made while 0.2.0 was already tagged: rather than cut a 0.2.1 to fix
+the placeholder icon, the stores simply stay empty until the mod is ready to be seen. So
+do not suggest an interim release, and do not publish v0.1.0 or v0.2.0 retroactively —
+those tags exist for GitHub and for sending a jar to a tester, nothing more. The real
+logo is already committed, so whenever 1.0.0 is cut it ships correctly.
+
+Both publish workflows fire on any tag starting with `v`, which means a 0.x tag pushed
+between now and then would publish to both stores anyway. There is deliberately no guard
+for that yet — if interim tags become useful, gate the workflows rather than relying on
+remembering.
+
 ## Working with the maintainer
 
 - Ask before adding a dependency or a new dev-runtime mod.
