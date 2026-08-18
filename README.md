@@ -260,6 +260,24 @@ protection mods can veto them individually.
 Only one chainsaw cut runs on a tree at a time. If somebody else is already cutting the tree
 you swing at, your break is an ordinary one and their cut carries on undisturbed.
 
+## AI disclosure
+
+I use the best tools available to me, and that includes an AI coding assistant. What I do
+not do is stand back and let it produce slop. Every line is read, checked and play-tested
+by me before it ships.
+
+I am a professional programmer. I have run plenty of public Minecraft servers, I
+understand how Minecraft actually works, and I wrote mods before any of this existed. The
+assistant does not decide what a mod is, how it should behave, or what stays out of scope
+— those are mine. What it does is raise the standard of the work around them: the
+documentation gets written properly, the awkward cases get covered, and nothing ships
+half-finished.
+
+That is also why my mods stay narrow in scope and behave themselves inside a pack:
+predictable, configurable, and careful with other people's mods.
+
+If something here is broken, it is mine to fix. Open an issue and I will.
+
 ## Licence
 
 [MIT](LICENSE).
