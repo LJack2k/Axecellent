@@ -1,0 +1,37 @@
+# Gradle
+.gradle/
+**/build/
+**/out/
+
+# Datagen output: the .cache index is machine-local, but the generated
+# resources themselves ARE committed — release.yml only runs `gradlew build`,
+# so a jar built in CI has to find the models/recipes/loot tables in the repo.
+# Run `gradlew :neoforge:runData` after changing content, then commit the diff.
+**/src/generated/resources/.cache/
+
+# NeoForge dev environment
+**/run/
+**/runs/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+# Local jars dropped into libs/ for offline use
+libs/*.jar
+
+# Dev run logs captured while testing
+*.log
+
+# Dev harness run dirs
+**/run-server/
+**/run-client/
+*.err
+
+# OS
+.DS_Store
+Thumbs.db

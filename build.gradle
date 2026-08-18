@@ -1,0 +1,6 @@
+// Root build for Axecellent.
+//
+// The mod itself is built in the neoforge/ subproject. This root file is
+// intentionally minimal — nothing builds at the root level. The multi-project
+// layout mirrors AE2-Organizer so a fabric/ subproject could be added later
+// without moving any source.

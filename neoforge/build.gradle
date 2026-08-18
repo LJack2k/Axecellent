@@ -1,0 +1,329 @@
+plugins {
+    id 'java-library'
+    // ModDevGradle — the modern way to develop NeoForge mods.
+    id 'net.neoforged.moddev' version '1.0.20'
+}
+
+version = mod_version
+group = mod_group_id
+
+java {
+    // Driven by java_version in gradle.properties so the toolchain and the
+    // release workflow can never drift (1.21.x = 21, 26.1+ = 25).
+    toolchain.languageVersion = JavaLanguageVersion.of(java_version as int)
+}
+
+base {
+    archivesName = "${mod_name}-neoforge-${minecraft_version}"
+}
+
+// A resources-only source set that exists ONLY in dev runs. It is attached to
+// the mod in the neoForge.mods block below, so it lands on the run classpath -
+// but the jar task packs the main source set alone, so nothing here can ever
+// reach players. Contents: the dev-world datapack (day / no mobs / no weather).
+sourceSets {
+    dev {}
+}
+
+// Datagen output is a second resource root rather than a copy step: runData
+// writes into src/generated/resources and the jar picks it up from there. The
+// generated files are COMMITTED (see .gitignore) because release.yml only runs
+// `gradlew build` - it never runs datagen.
+// exclude '.cache': datagen writes a hash index in there. It is gitignored, but it
+// is still a real file under a resource root, so without this it gets packed into
+// the published jar as junk.
+sourceSets.main.resources {
+    srcDir 'src/generated/resources'
+    exclude '.cache/**'
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'NeoForged'
+        url = 'https://maven.neoforged.net/releases'
+    }
+    // CurseMaven — for mods published only on CurseForge. Coordinate format:
+    //   curse.maven:<slug>-<projectId>:<fileId>
+    maven {
+        name = 'CurseMaven'
+        url = 'https://www.cursemaven.com'
+        content { includeGroup 'curse.maven' }
+    }
+    // KubeJS + Rhino. Restricted to the two dev.latvian groups so it never slows
+    // down or interferes with resolution of anything else. Listed explicitly rather
+    // than by regex: a backslash escape in a single-quoted Groovy string (as in
+    // 'dev\.latvian\..*') is a configuration-time parse error.
+    maven {
+        name = 'Latvian Mods'
+        url = 'https://maven.saps.dev/releases'
+        content {
+            includeGroup 'dev.latvian.mods'
+            includeGroup 'dev.latvian.apps'
+        }
+    }
+    // One KubeJS transitive (animated-gif-lib-for-java) is only on JitPack.
+    maven {
+        name = 'JitPack'
+        url = 'https://jitpack.io'
+        content { includeGroup 'com.github.rtyley' }
+    }
+    // Local jars fallback.
+    flatDir { dirs 'libs' }
+}
+
+neoForge {
+    version = neo_version
+
+    runs {
+        client {
+            client()
+            systemProperty 'axecellent.devWindowX', dev_window_x
+            systemProperty 'axecellent.devWindowY', dev_window_y
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            systemProperty 'forge.logging.console.level', 'debug'
+            programArguments.addAll '--width', '1920', '--height', '1000'
+        }
+        // Data generation. Writes models/recipes/loot/tags into
+        // src/generated/resources, reading src/main/resources as the "existing"
+        // pack so hand-written files (lang, textures) are not reported missing.
+        data {
+            data()
+            programArguments.addAll '--mod', mod_id, '--all',
+                    '--output', file('src/generated/resources/').getAbsolutePath(),
+                    '--existing', file('src/main/resources/').getAbsolutePath()
+        }
+        // Auto-joining dev client + dedicated server for the RCON/screenshot harness
+        // (dev-only; enabled by the axecellent.devHarness system property). Separate
+        // game dirs so client/server don't contend on world/log locks.
+        clientJoin {
+            client()
+            gameDirectory = file('run-client')
+            systemProperty 'forge.logging.console.level', 'info'
+            systemProperty 'axecellent.devWindowX', dev_window_x
+            systemProperty 'axecellent.devWindowY', dev_window_y
+            systemProperty 'axecellent.devHarness', 'true'
+            jvmArguments.addAll '-Xmx4G'
+            programArguments.addAll '--width', '1920', '--height', '1000',
+                    '--quickPlayMultiplayer', 'localhost:25565'
+        }
+        server {
+            server()
+            gameDirectory = file('run-server')
+            systemProperty 'axecellent.devHarness', 'true'
+            programArgument '--nogui'
+            jvmArguments.addAll '-Xmx4G'
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+            // Dev-only overlay (src/dev/resources) - see the sourceSets block above.
+            sourceSet sourceSets.dev
+        }
+    }
+}
+
+dependencies {
+    // JEI — DEV ONLY. Not compiled against and never declared in
+    // neoforge.mods.toml; it is on the dev client purely for item search and
+    // cheat-spawning this mod's items while testing.
+    // -PnoJei drops it, e.g. to check the mod loads with nothing else present.
+    if (!project.hasProperty('noJei')) {
+        runtimeOnly "curse.maven:jei-238222:${jei_curse_file_id}"
+    }
+
+    // KubeJS — DEV ONLY pack-dev tooling. /kubejs hand dumps the held item's id,
+    // tags and components, which is the practical way to inspect a tag-driven mod
+    // in-game. Rhino (its JS engine) arrives transitively via KubeJS's POM.
+    // Not compiled against, never declared in neoforge.mods.toml, never bundled.
+    // -PnoKubeJs drops it from the dev runtime.
+    if (!project.hasProperty('noKubeJs')) {
+        runtimeOnly("dev.latvian.mods:kubejs-neoforge:${kubejs_version}") {
+            // KubeJS's POM declares better-advanced-tooltips, but that artifact is
+            // not published on maven.saps.dev (404), so resolution fails without
+            // this exclusion. It is a separate companion mod; if KubeJS ever turns
+            // out to need it to start, fetch it from CurseForge instead.
+            exclude group: 'dev.latvian.mods', module: 'better-advanced-tooltips'
+        }
+    }
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+        minecraft_version       : minecraft_version,
+        minecraft_version_range : minecraft_version_range,
+        neo_version             : neo_version,
+        neo_version_range       : neo_version_range,
+        loader_version_range    : loader_version_range,
+        mod_id                  : mod_id,
+        mod_name                : mod_name,
+        mod_display_name        : mod_display_name,
+        mod_license             : mod_license,
+        mod_version             : mod_version,
+        mod_authors             : mod_authors,
+        mod_description         : mod_description
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand replaceProperties
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    // Deprecation detail rather than a bare 'uses a deprecated API' note: Mojang and NeoForge
+    // deprecate things regularly, and knowing which call it is decides whether to migrate now.
+    options.compilerArgs << '-Xlint:deprecation'
+}
+
+// The RCON/screenshot test harness stays in the repo (it is how a release gets
+// verified headlessly) but must never reach players: strip it from the published
+// jar, along with the datagen providers, which are build-time only.
+//
+// Safe because NOTHING shipped references these classes: the dev ones self-register
+// by annotation (@EventBusSubscriber), so FML finds them in dev where they exist and
+// finds nothing in production where they don't. A guarded call from shipped code
+// would not be safe - it would still leave a reference to a missing class in the
+// bytecode. Dev runs are unaffected: they run from the compiled classes directory,
+// not from this jar.
+tasks.named('jar') {
+    exclude 'nl/ljack2k/axecellent/dev/**'
+    exclude 'nl/ljack2k/axecellent/datagen/**'
+    exclude 'nl/ljack2k/axecellent/client/ClientScreenshot*'
+    exclude 'nl/ljack2k/axecellent/client/DevClientWindow*'
+}
+
+// --- Dev harness bootstrap -------------------------------------------------
+// run-server/ is a game install, so it is gitignored - which means a fresh clone
+// has no eula.txt (the server boots, refuses, exits) and no RCON. This task is
+// the committed source of that config: it seeds the files on first runServer and
+// never overwrites an existing one, so hand-tweaks survive.
+//
+// World *rules* (day, no mobs, no weather) deliberately do NOT live here -
+// server.properties cannot express them and would not apply to a single-player
+// runClient world. They live in the dev datapack at src/dev/resources instead.
+var devServerProperties = [
+        '# Seeded by :neoforge:prepareDevServer - dev harness only, never a real server.',
+        '# RCON is what lets an agent drive the game headlessly (/axecellent tree|cut|break).',
+        'enable-rcon=true',
+        'rcon.port=25575',
+        'rcon.password=axe',
+        'broadcast-rcon-to-ops=true',
+        '# No auth, so runClientJoin can connect with a dev profile.',
+        'online-mode=false',
+        '# Flat + creative: a predictable, empty stage for screenshots.',
+        'level-type=minecraft:flat',
+        // Explicit flat layers: with generator-settings empty, the server logs
+        // 'No key layers in MapLike[{}]' as an ERROR on first world creation and
+        // falls back to the default preset. Spelling it out keeps the dev log clean,
+        // which matters because harness verification greps for ERROR.
+        'generator-settings={"layers":[{"block":"minecraft:bedrock","height":1},{"block":"minecraft:dirt","height":2},{"block":"minecraft:grass_block","height":1}],"biome":"minecraft:plains"}',
+        'gamemode=creative',
+        '# peaceful + the three spawn switches: nothing hostile, nothing passive,',
+        '# no villagers. The dev datapack enforces the same thing client-side.',
+        'difficulty=peaceful',
+        'spawn-monsters=false',
+        'spawn-animals=false',
+        'spawn-npcs=false',
+        'spawn-protection=0',
+        '# Slow agent turns and breakpoints must not trip the watchdog.',
+        'max-tick-time=-1',
+        '# Command blocks are how a human drives the mod in-game without typing - handy for',
+        '# filming or demoing. Read only at startup, so it has to be seeded rather than set later.',
+        'enable-command-block=true',
+        'motd=Axecellent dev harness',
+        ''
+].join(System.lineSeparator())
+
+var prepareDevServer = tasks.register('prepareDevServer') {
+    description = 'Seeds neoforge/run-server with eula.txt + server.properties for the dev harness.'
+    var dir = file('run-server')
+    doLast {
+        dir.mkdirs()
+        var eula = new File(dir, 'eula.txt')
+        if (!eula.exists()) {
+            eula.text = 'eula=true' + System.lineSeparator()
+            logger.lifecycle("Seeded ${eula} (accepts the Minecraft EULA for this DEV server only).")
+        }
+        var props = new File(dir, 'server.properties')
+        if (!props.exists()) {
+            props.text = devServerProperties
+            logger.lifecycle("Seeded ${props} (RCON on :25575, password 'axe').")
+        }
+        // Op the dev player so /reload, /datapack and /axecellent work from the
+        // in-game chat bar, not just over RCON (RCON always runs as console, which
+        // is why this is easy to forget until you try to type a command in-game).
+        //
+        // 'Dev' is ModDevGradle's default dev username. The server runs offline, so
+        // the UUID is derived the way Minecraft derives one for an unauthenticated
+        // player - deterministic, so this works on a fresh clone that has never
+        // logged in. Verified equal to the usercache entry from a real login.
+        var ops = new File(dir, 'ops.json')
+        if (!ops.exists()) {
+            var devName = 'Dev'
+            var devUuid = UUID.nameUUIDFromBytes("OfflinePlayer:${devName}".getBytes('UTF-8')).toString()
+            // Built as a joined List of single-quoted lines, like the
+            // server.properties seed above: a '"""' block has misparsed in this
+            // build script before, and JSON is all double quotes.
+            ops.text = [
+                    '[',
+                    '  {',
+                    '    "uuid": "' + devUuid + '",',
+                    '    "name": "' + devName + '",',
+                    '    "level": 4,',
+                    '    "bypassesPlayerLimit": false',
+                    '  }',
+                    ']',
+                    ''
+            ].join(System.lineSeparator())
+            logger.lifecycle("Seeded ${ops} (${devName} opped at level 4).")
+        }
+    }
+}
+
+tasks.named('runServer') {
+    dependsOn prepareDevServer
+}
+
+// --- Dev client window placement -------------------------------------------
+// Minecraft has no window-position startup parameter, and the first window shown
+// is FML's early loading window - created before any mod code exists. So an
+// in-game hook can only move the window AFTER it has flashed up on the primary
+// monitor for several seconds, which is worse than useless on a multi-monitor
+// desk. tools/SnapDevWindow.ps1 runs as a separate process instead: it waits for
+// the window, hides it, moves it, and shows it again, so it never appears on the
+// wrong screen. DevClientWindow.java still applies the same position from inside
+// the game as a fallback for non-Windows machines.
+//
+// Windows-only by nature (it calls user32). Skipped silently elsewhere, and
+// skipped entirely when dev_window_x is blank.
+var snapDevWindow = tasks.register('snapDevWindow') {
+    description = 'Moves the dev client window onto the monitor given by dev_window_x/y.'
+    doLast {
+        if (!System.getProperty('os.name').toLowerCase().contains('windows')) {
+            logger.info('snapDevWindow: not Windows, leaving the window where it lands.')
+            return
+        }
+        if (!dev_window_x?.trim() || !dev_window_y?.trim()) {
+            logger.info('snapDevWindow: dev_window_x/y not set, skipping.')
+            return
+        }
+        var script = rootProject.file('tools/SnapDevWindow.ps1')
+        // Detached on purpose: this has to outlive the task and run WHILE the game
+        // starts, so it cannot be a blocking exec.
+        new ProcessBuilder('powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+                '-File', script.absolutePath,
+                '-X', dev_window_x.trim(), '-Y', dev_window_y.trim())
+                .redirectErrorStream(true)
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .start()
+        logger.lifecycle("snapDevWindow: watching for the client window, will place it at ${dev_window_x},${dev_window_y}.")
+    }
+}
+
+tasks.matching { it.name in ['runClient', 'runClientJoin'] }.configureEach {
+    dependsOn snapDevWindow
+}

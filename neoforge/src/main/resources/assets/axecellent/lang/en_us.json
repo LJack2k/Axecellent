@@ -1,0 +1,21 @@
+{
+  "axecellent.tooltip.chainsaw": "Chainsaw",
+
+  "axecellent.configuration.mode": "Cut mode",
+  "axecellent.configuration.held_sneak_starts_at_you": "Crouch cuts from you outward (HELD)",
+  "axecellent.configuration.held_logs_per_chop": "Logs per completed chop (HELD)",
+  "axecellent.configuration.held_resume_window": "Resume window for a paused cut (seconds)",
+  "axecellent.configuration.logs_per_tick": "Logs per tick (progressive)",
+  "axecellent.configuration.max_concurrent_cuts": "Max trees falling at once",
+  "axecellent.configuration.max_logs": "Max logs per break",
+  "axecellent.configuration.clear_leaves": "Clear leaves",
+  "axecellent.configuration.max_leaves": "Max leaves per break (0 = no limit)",
+  "axecellent.configuration.require_leaves": "Only cut logs with leaves attached",
+  "axecellent.configuration.drops_at_break_position": "Drops land at the broken block",
+  "axecellent.configuration.sneak_to_disable": "Sneak to break a single log",
+  "axecellent.configuration.enabled_in_creative": "Use the chainsaw in creative mode",
+  "axecellent.configuration.respect_block_protection": "Respect block protection mods",
+  "axecellent.configuration.durability_per_log": "Durability per extra log",
+  "axecellent.configuration.durability_for_leaves": "Charge durability for leaves",
+  "axecellent.configuration.stop_before_tool_breaks": "Stop before the tool breaks"
+}

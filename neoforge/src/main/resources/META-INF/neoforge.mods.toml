@@ -1,0 +1,36 @@
+modLoader = "javafml"
+loaderVersion = "${loader_version_range}"
+license = "${mod_license}"
+
+[[mods]]
+modId = "${mod_id}"
+version = "${mod_version}"
+displayName = "${mod_display_name}"
+authors = "${mod_authors}"
+description = '''${mod_description}'''
+logoFile = "icon.png"
+logoBlur = true
+# All behaviour is server-side: felling happens on the server and the client runs
+# no Axecellent code at all. IGNORE_ALL_VERSION so a client WITHOUT the mod can
+# still join a server that has it - handy for a server-only install.
+displayTest = "IGNORE_ALL_VERSION"
+
+# --- Required ---
+[[dependencies.${mod_id}]]
+modId = "neoforge"
+type = "required"
+versionRange = "${neo_version_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.${mod_id}]]
+modId = "minecraft"
+type = "required"
+versionRange = "${minecraft_version_range}"
+ordering = "NONE"
+side = "BOTH"
+
+# --- Optional integrations go here ---
+# Nothing else is required. The mod adds no items, blocks or enchantments; which
+# tools can fell trees is decided entirely by the #axecellent:tree_felling item
+# tag, so any datapack can grant it without a code dependency.
