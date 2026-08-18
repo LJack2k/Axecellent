@@ -1,3 +1,5 @@
+<img src="branding/icon-256.png" alt="" width="128" align="right">
+
 # Axecellent
 
 Chop the base of a tree and watch it come apart — branch tips first, working back to the

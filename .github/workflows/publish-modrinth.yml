@@ -5,10 +5,13 @@ name: Publish to Modrinth
 # doesn't fire downstream release events). Or run manually: Actions -> Publish to
 # Modrinth -> Run workflow -> enter the tag (e.g. v0.1.0) to retry just Modrinth.
 #
-# SETUP REQUIRED before this can work:
-#   1. Create the Modrinth project, then put its base62 project ID in modrinth-id
-#      below (the slug is NOT accepted if it contains a hyphen).
-#   2. Add a MODRINTH_TOKEN repository secret.
+# Set up and live: the project ID is below and MODRINTH_TOKEN is a repository secret.
+# That token needs the "Create versions" scope or the upload comes back 401.
+#
+# A draft project is invisible to the public API until it has a version and has passed
+# review, so a 404 from api.modrinth.com before the first publish is expected, not a
+# wrong ID. This workflow supplying that first version is what makes the project
+# submittable for review.
 
 on:
   workflow_run:
@@ -66,8 +69,9 @@ jobs:
       - name: Publish to Modrinth
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          # TODO replace with the Modrinth base62 project ID once the project exists.
-          modrinth-id: TODO_MODRINTH_ID
+          # Base62 project ID from Settings -> General. Used rather than the slug so a
+          # later rename cannot break publishing.
+          modrinth-id: XeFzQKvm
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
 
           files: dist/*.jar

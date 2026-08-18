@@ -382,10 +382,12 @@ unzip -p neoforge/build/moddev/artifacts/neoforge-21.1.242-minecraft-sources.jar
 4. `release.yml` builds the jar and creates the GitHub Release;
    `publish-curseforge.yml` / `publish-modrinth.yml` run off that.
 
-**Not wired up yet:** both publish workflows carry placeholder project IDs
-(`curseforge-id: 000000`, `modrinth-id: TODO_MODRINTH_ID`) and need the
-`CURSEFORGE_TOKEN` / `MODRINTH_TOKEN` secrets. They fail until the projects exist —
-expected; `release.yml` succeeds regardless.
+**Publishing is wired up.** CurseForge `1658255`, Modrinth `XeFzQKvm`, with
+`CURSEFORGE_TOKEN` / `MODRINTH_TOKEN` as repository secrets. Which means **pushing a
+version tag now publishes publicly to both stores**, not just to GitHub: `release.yml`
+creates the Release, and both publish workflows fire off its completion. A store version
+cannot be cleanly retracted, so do not push a tag speculatively, and never as a way of
+testing the pipeline — use Actions -> Run workflow against an existing tag for that.
 
 ## Working with the maintainer
 

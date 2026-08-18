@@ -4,10 +4,10 @@ name: Publish to CurseForge
 # tag, or manually via Actions -> Publish to CurseForge -> Run workflow -> enter
 # the tag to retry just CurseForge.
 #
-# SETUP REQUIRED before this can work:
-#   1. Create the CurseForge project, then put its numeric Project ID (project
-#      page sidebar) in curseforge-id below.
-#   2. Add a CURSEFORGE_TOKEN repository secret.
+# Set up and live: the project ID is below and CURSEFORGE_TOKEN is a repository secret.
+#
+# A brand-new CurseForge project is held for moderator approval, so the first upload
+# lands in review rather than appearing straight away. Later uploads are immediate.
 
 on:
   workflow_run:
@@ -65,8 +65,8 @@ jobs:
       - name: Publish to CurseForge
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          # TODO replace with the numeric CurseForge project ID once it exists.
-          curseforge-id: 000000
+          # Numeric Project ID from the project page sidebar - not the slug.
+          curseforge-id: 1658255
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
 
           files: dist/*.jar

@@ -68,7 +68,7 @@ neoforge/src/generated/        datagen output (committed)
 tools/Rcon.java                headless RCON client (single-file, no build step)
 tools/axe.ps1                  wrapper so RCON works from any directory
 tools/SnapDevWindow.ps1        puts the dev client window on the right monitor
-branding/                      icon set (placeholder — regenerate from icon.svg)
+branding/                      logo master + generated icon set (see MakeIcons.java)
 ```
 
 ### How the chainsaw works
@@ -296,5 +296,8 @@ Both fail loudly until then; `release.yml` is unaffected.
 - `displayTest = "IGNORE_ALL_VERSION"` is set because all behaviour is server-side,
   so a client without Axecellent can join a server that has it. This has not been
   verified against a genuinely mod-less client in dev.
-- The `branding/` icons and `neoforge/src/main/resources/icon.png` are generated
-  placeholders; `branding/icon.svg` is the source of the design.
+- `branding/logo_fullsize.jpg` is the logo master (1024x1024, as delivered). Every PNG
+  in `branding/` and the shipped `neoforge/src/main/resources/icon.png` are cut from it
+  by `java branding/MakeIcons.java` — replace the master and re-run rather than editing
+  a PNG by hand. It shrinks by repeated halving, because one straight 1024→64 draw
+  breaks up the outlines.
